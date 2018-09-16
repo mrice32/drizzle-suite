@@ -1,97 +1,112 @@
-import { drizzleConnect } from 'drizzle-react'
 import React, { Component } from 'react'
-import PropTypes from 'prop-types'
 
 /*
  * Create component.
  */
 
 class ContractForm extends Component {
-  constructor(props, context) {
-    super(props);
+  constructor(props) {
+    super(props)
 
-    this.handleInputChange = this.handleInputChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
-
-    this.contracts = context.drizzle.contracts;
+    this.handleInputChange = this.handleInputChange.bind(this)
+    this.handleSubmit = this.handleSubmit.bind(this)
 
     // Get the contract ABI
-    const abi = this.contracts[this.props.contract].abi;
+    const abi = this.props.drizzle.contracts[this.props.contract].abi
 
-    this.inputs = [];
-    var initialState = {};
+    this.inputs = []
+    var initialState = {}
 
     // Iterate over abi for correct function.
     for (var i = 0; i < abi.length; i++) {
-        if (abi[i].name === this.props.method) {
-            this.inputs = abi[i].inputs;
+      if (abi[i].name === this.props.method) {
+        this.inputs = abi[i].inputs
 
-            for (var i = 0; i < this.inputs.length; i++) {
-                initialState[this.inputs[i].name] = '';
-            }
-
-            break;
+        for (var j = 0; j < this.inputs.length; j++) {
+          initialState[this.inputs[j].name] = ''
         }
+
+        break
+      }
     }
 
-    this.state = initialState;
-  }
-
-  handleSubmit() {
-    if (this.props.sendArgs) {
-      return this.contracts[this.props.contract].methods[this.props.method].cacheSend(...Object.values(this.state), this.props.sendArgs);
-    }
-
-    this.contracts[this.props.contract].methods[this.props.method].cacheSend(...Object.values(this.state));
-  }
-
-  handleInputChange(event) {
-    this.setState({ [event.target.name]: event.target.value });
-  }
-
-  translateType(type) {
-    switch(true) {
-        case /^uint/.test(type):
-            return 'number'
-            break
-        case /^string/.test(type) || /^bytes/.test(type):
-            return 'text'
-            break
-        case /^bool/.test(type):
-            return 'checkbox'
-            break
-        default:
-            return 'text'
-    }
+    this.state = initialState
   }
 
   render() {
     return (
       <form className="pure-form pure-form-stacked">
-        {this.inputs.map((input, index) => {            
-            var inputType = this.translateType(input.type)
-            var inputLabel = this.props.labels ? this.props.labels[index] : input.name
-            // check if input type is struct and if so loop out struct fields as well
-            return (<input key={input.name} type={inputType} name={input.name} value={this.state[input.name]} placeholder={inputLabel} onChange={this.handleInputChange} />)
+        <strong>
+          {!this.props.hideMethod ? this.props.method + ': ' : null}
+        </strong>
+        {this.inputs.map((input, index) => {
+          var inputType = this.translateType(input.type)
+          var inputLabel = this.props.labels
+            ? this.props.labels[index]
+            : input.name
+          return (
+            <input
+              key={input.name}
+              type={inputType}
+              name={input.name}
+              value={this.state[input.name]}
+              placeholder={inputLabel}
+              onChange={this.handleInputChange}
+            />
+          )
         })}
-        <button key="submit" className="pure-button" type="button" onClick={this.handleSubmit}>Submit</button>
+        <button
+          key="submit"
+          className="pure-button"
+          type="button"
+          onClick={this.handleSubmit}
+        >
+          Submit
+        </button>
       </form>
     )
   }
-}
 
-ContractForm.contextTypes = {
-  drizzle: PropTypes.object
-}
+  handleSubmit() {
+    // If an input is of type bytes32 then convert the entered text to hex, if it isn't already valid hex, using web3.
+    const values = this.inputs.map((input, i) => {
+      if (
+        input.type === 'bytes32' &&
+        !this.props.drizzle.web3.utils.isHex(this.state[input.name])
+      ) {
+        return this.props.drizzle.web3.utils.toHex(this.state[input.name])
+      } else {
+        return this.state[input.name]
+      }
+    })
 
-/*
- * Export connected component.
- */
+    if (this.props.sendArgs) {
+      return this.props.drizzle.contracts[this.props.contract].methods[
+        this.props.method
+      ].cacheSend(...values, this.props.sendArgs)
+    }
 
-const mapStateToProps = state => {
-  return {
-    contracts: state.contracts
+    this.props.drizzle.contracts[this.props.contract].methods[
+      this.props.method
+    ].cacheSend(...values)
+  }
+
+  handleInputChange(event) {
+    this.setState({ [event.target.name]: event.target.value })
+  }
+
+  translateType(type) {
+    switch (true) {
+      case /^uint/.test(type):
+        return 'number'
+      case /^string/.test(type) || /^bytes/.test(type):
+        return 'text'
+      case /^bool/.test(type):
+        return 'checkbox'
+      default:
+        return 'text'
+    }
   }
 }
 
-export default drizzleConnect(ContractForm, mapStateToProps)
+export default ContractForm
